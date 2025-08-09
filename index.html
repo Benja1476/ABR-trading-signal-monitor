@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Trading Signal Monitor — ARB/USDT (Live 15m EMA/RSI)</title>
+
+  <style>
+    :root {
+      --primary: #8b5cf6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --dark: #1e293b;
+      --darker: #0f172a;
+      --light: #f1f5f9;
+      --gray: #94a3b8;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;}
+    body{background:linear-gradient(135deg,var(--darker),#4c1d95,var(--darker));color:#fff;min-height:100vh;padding:20px}
+    .container{max-width:1200px;margin:0 auto}
+    header{background:rgba(30,41,59,.85);backdrop-filter:blur(8px);border-radius:12px;padding:18px;margin-bottom:18px;border:1px solid rgba(148,163,184,.12)}
+    .header-content{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .logo{display:flex;gap:12px;align-items:center}
+    .logo-icon{width:44px;height:44;border-radius:10px;background:linear-gradient(45deg,var(--primary),#ec4899);display:flex;align-items:center;justify-content:center}
+    .logo-text h1{font-size:20px;margin-bottom:2px}
+    .logo-text p{color:var(--gray);font-size:13px}
+    .status-pill{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:20px;background:rgba(239,68,68,.12)}
+    .status-dot{width:10px;height:10px;border-radius:50%;background:var(--danger)}
+    .status-pill.connected{background:rgba(16,185,129,.12)}
+    .status-pill.connected .status-dot{background:var(--success)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:14px}
+    .card{background:rgba(15,23,42,.6);padding:16px;border-radius:12px;border:1px solid rgba(148,163,184,.06)}
+    .title{font-weight:700;margin-bottom:8px}
+    .big{font-size:24px;font-weight:800}
+    .progress-bar{height:8px;background:rgba(148,163,184,.12);border-radius:6px;overflow:hidden}
+    .progress-fill{height:100%;transition:width .4s ease;border-radius:6px}
+    .signals-list{max-height:320px;overflow:auto}
+    .signal-entry{padding:10px;border-radius:10px;background:rgba(0,0,0,.06);margin-bottom:10px;border:1px solid rgba(148,163,184,.04)}
+    .small-muted{color:var(--gray);font-size:13px}
+    .kv{font-size:28px;font-weight:700}
+    .slide-card{transition:all .25s ease}
+    .slide-card:hover{transform:translateY(-6px)}
+    @media (max-width:900px){ .header-content{flex-direction:column;align-items:flex-start} .grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <div class="logo-icon" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+        </div>
+        <div class="logo-text">
+          <h1>Trading Signal Monitor</h1>
+          <p>ARB/USDT — Live 15m EMA/RSI</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center">
+        <div id="connPill" class="status-pill"><div class="status-dot"></div><div id="connText">Connecting...</div></div>
+        <div style="text-align:right">
+          <div class="small-muted">Last update</div>
+          <div id="currentTime" class="kv value-mono">--:--:--</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- top cards -->
+  <div class="grid">
+    <div class="card">
+      <div class="title">Price (ARB/USDT)</div>
+      <div class="big value-mono" id="currentPrice">0.000000</div>
+      <div class="small-muted" id="priceChange">+0.00%</div>
+    </div>
+
+    <div class="card">
+      <div class="title">EMA 55</div>
+      <div class="big value-mono" id="ema55">0.000000</div>
+      <div class="small-muted" id="emaStatus">-</div>
+    </div>
+
+    <div class="card">
+      <div class="title">RSI (14)</div>
+      <div class="big value-mono" id="rsiValue">0.00</div>
+      <div class="small-muted" id="rsiStatus">Neutral</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Connection</div>
+      <div class="big" id="connectionState">Offline</div>
+      <div class="small-muted">Binance API</div>
+    </div>
+  </div>
+
+  <!-- Slides & signals -->
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:14px">
+    <div>
+      <div class="card">
+        <div class="title">Signal Progress</div>
+
+        <!-- Slide 1 -->
+        <div class="slide-card card" style="margin-top:12px;background:linear-gradient(90deg,#0ea5a6,#0284c7);">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Slide 1 — Continue Up</strong><div class="small-muted">RSI>70 → RSI<30 → RSI>70 → price>EMA55 → Long</div></div>
+            <div id="slide1-status" class="small-muted">รอสัญญาณ</div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:space-between"><span>ความคืบหน้า</span><span id="slide1-progress-text">0/4</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div id="slide1-progress" class="progress-fill" style="width:0%;background:#06b6d4"></div></div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="slide-card card" style="margin-top:12px;background:linear-gradient(90deg,#16a34a,#65a30d);">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Slide 2 — Reversal Down</strong><div class="small-muted">RSI>70 → RSI<30 → RSI>70 → price breaks above EMA then falls → Short</div></div>
+            <div id="slide2-status" class="small-muted">รอสัญญาณ</div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:space-between"><span>ความคืบหน้า</span><span id="slide2-progress-text">0/4</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div id="slide2-progress" class="progress-fill" style="width:0%;background:#84cc16"></div></div>
+          <div style="margin-top:8px" class="small-muted">Awaiting: <span id="slide2-awaiting">ไม่รอ</span></div>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="slide-card card" style="margin-top:12px;background:linear-gradient(90deg,#7c3aed,#8b5cf6);">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Slide 3 — Continue Down</strong><div class="small-muted">RSI<30 → RSI>70 → RSI<30 → price<EMA55 → Short</div></div>
+            <div id="slide3-status" class="small-muted">รอสัญญาณ</div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:space-between"><span>ความคืบหน้า</span><span id="slide3-progress-text">0/4</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div id="slide3-progress" class="progress-fill" style="width:0%;background:#8b5cf6"></div></div>
+        </div>
+
+        <!-- Slide 4 -->
+        <div class="slide-card card" style="margin-top:12px;background:linear-gradient(90deg,#dc2626,#ef4444);">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><strong>Slide 4 — Reversal Up</strong><div class="small-muted">RSI<30 → RSI>70 → RSI<30 (no new low) → price breaks below EMA then rises → Long</div></div>
+            <div id="slide4-status" class="small-muted">รอสัญญาณ</div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:space-between"><span>ความคืบหน้า</span><span id="slide4-progress-text">0/4</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div id="slide4-progress" class="progress-fill" style="width:0%;background:#fb7185"></div></div>
+          <div style="margin-top:8px" class="small-muted">Awaiting: <span id="slide4-awaiting">ไม่รอ</span></div>
+        </div>
+
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="title">Recent Signals</div>
+        <div id="signalsList" class="signals-list" style="margin-top:10px">
+          <div class="signal-entry small-muted" id="noSignals">Waiting for signals...</div>
+        </div>
+      </div>
+    </div>
+
+    <aside>
+      <div class="card">
+        <div class="title">Bot Status</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+          <div class="card" style="padding:10px;background:transparent;border:none">
+            <div class="small-muted">Signals Sent</div>
+            <div id="sentCount" class="kv">0</div>
+          </div>
+          <div class="card" style="padding:10px;background:transparent;border:none">
+            <div class="small-muted">Waiting Price Break</div>
+            <div id="waitingCount" class="kv">0</div>
+          </div>
+          <div class="card" style="padding:10px;background:transparent;border:none">
+            <div class="small-muted">Active Patterns</div>
+            <div id="activeCount" class="kv">0</div>
+          </div>
+          <div class="card" style="padding:10px;background:transparent;border:none">
+            <div class="small-muted">Total Sides</div>
+            <div class="kv">4</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+</div>
+
+<script>
+  /* ====== Config ====== */
+  const SYMBOL = 'ARBUSDT';
+  const KLINE_INTERVAL = '15m'; // 15 นาที
+  const KLINE_LIMIT = 500;
+  const EMA_PERIOD = 55;
+  const RSI_PERIOD = 14;
+
+  /* ====== State ====== */
+  let closes = [];            // เก็บราคาปิดแท่งเทียน 15m
+  let ema55 = null;
+  let avgGain = null, avgLoss = null;
+  let lastClose = null;
+  let rsiValue = null;
+  let prevRsi = null;
+  let prevPrice = null;
+
+  let slidesSteps = {1:[false,false,false,false],2:[false,false,false,false],3:[false,false,false,false],4:[false,false,false,false]};
+  let slidesSent = [];
+  let slide2_brokeAboveEMA = false;
+  let slide4_brokeBelowEMA = false;
+  let slide4_price_at_step1_low = null;
+  let slide1_price_at_step2_low = null;
+
+  /* ====== DOM helpers ====== */
+  const $ = id => document.getElementById(id);
+  function nowTime(){ return new Date().toLocaleTimeString('th-TH'); }
+  function setConn(connected){
+    const pill = $('connPill');
+    const text = $('connText');
+    const state = $('connectionState');
+    if(connected){
+      pill.classList.add('connected');
+      text.textContent = 'Connected';
+      state.textContent = 'Online';
+      state.style.color = 'var(--success)';
+    } else {
+      pill.classList.remove('connected');
+      text.textContent = 'Connecting...';
+      state.textContent = 'Offline';
+      state.style.color = 'var(--danger)';
+    }
+  }
+
+  /* ====== EMA & RSI Calculation Functions ====== */
+  // EMA helper - Exponential Moving Average
+  function calculateEMA(data, period) {
+    const k = 2 / (period + 1);
+    let emaArray = [];
+    let emaPrev = data[0];
+    emaArray.push(emaPrev);
+    for(let i=1; i<data.length; i++) {
+      emaPrev = data[i]*k + emaPrev*(1-k);
+      emaArray.push(emaPrev);
+    }
+    return emaArray;
+  }
+
+  // RSI Calculation (Smoothed RSI)
+  function calculateRSI(closes, period) {
+    if(closes.length < period+1) return null;
+    let gains = 0;
+    let losses = 0;
+    for(let i=1; i<=period; i++){
+      let diff = closes[i] - closes[i-1];
+      if(diff > 0) gains += diff;
+      else losses += -diff;
+    }
+    let avgGain = gains/period;
+    let avgLoss = losses/period;
+    let rs = avgGain / avgLoss;
+    let rsi = 100 - (100 / (1 + rs));
+
+    // Smoothed RSI calculation
+    for(let i=period+1; i<closes.length; i++) {
+      let diff = closes[i] - closes[i-1];
+      let gain = diff > 0 ? diff : 0;
+      let loss = diff < 0 ? -diff : 0;
+      avgGain = ((avgGain * (period - 1)) + gain) / period;
+      avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+      rs = avgGain / avgLoss;
+      rsi = 100 - (100 / (1 + rs));
+    }
+    return rsi;
+  }
+
+  /* ====== Binance API fetch functions ====== */
+  async function fetchKlines(symbol, interval, limit) {
+    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const response = await fetch(url);
+    if(!response.ok) throw new Error('Klines fetch error');
+    const data = await response.json();
+    return data;
+  }
+
+  async function fetchRealtimePrice(symbol) {
+    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`;
+    const response = await fetch(url);
+    if(!response.ok) throw new Error('Price fetch error');
+    const data = await response.json();
+    return parseFloat(data.price);
+  }
+
+  /* ====== Main update loop ====== */
+
+  async function updateCandleData() {
+    try {
+      const klines = await fetchKlines(SYMBOL, KLINE_INTERVAL, KLINE_LIMIT);
+      setConn(true);
+
+      // Update closes array
+      closes = klines.map(k => parseFloat(k[4]));
+
+      if(closes.length < EMA_PERIOD + RSI_PERIOD) {
+        console.warn('Data not enough for indicators');
+        return;
+      }
+
+      // Calculate EMA55 (get last value)
+      const emaArray = calculateEMA(closes, EMA_PERIOD);
+      ema55 = emaArray[emaArray.length - 1];
+      $('ema55').textContent = ema55.toFixed(6);
+
+      // Calculate RSI
+      rsiValue = calculateRSI(closes, RSI_PERIOD);
+      if(rsiValue !== null){
+        $('rsiValue').textContent = rsiValue.toFixed(2);
+        if(rsiValue > 70) {
+          $('rsiStatus').textContent = 'Overbought';
+          $('rsiStatus').style.color = 'var(--danger)';
+        } else if(rsiValue < 30) {
+          $('rsiStatus').textContent = 'Oversold';
+          $('rsiStatus').style.color = 'var(--success)';
+        } else {
+          $('rsiStatus').textContent = 'Neutral';
+          $('rsiStatus').style.color = '#ccc';
+        }
+      }
+
+      // Update last close price
+      lastClose = closes[closes.length-1];
+
+      // Update price on UI only if not yet updated by realtime
+      if(prevPrice === null) {
+        prevPrice = lastClose;
+        updatePriceUI(lastClose);
+      }
+
+      updateTimeUI();
+
+      // Update slide steps based on new EMA & RSI data
+      evaluateSlides();
+
+    } catch (e) {
+      console.error('Error updateCandleData:', e);
+      setConn(false);
+    }
+  }
+
+  /* ====== Real-time Price Polling ====== */
+  async function pollRealtimePrice() {
+    try {
+      const price = await fetchRealtimePrice(SYMBOL);
+      if(price) {
+        // Update UI price
+        updatePriceUI(price);
+      }
+    } catch(e) {
+      console.error('Realtime price fetch error:', e);
+      setConn(false);
+    }
+  }
+
+  /* ====== UI update helpers ====== */
+  function updatePriceUI(price) {
+    const el = $('currentPrice');
+    const changeEl = $('priceChange');
+
+    if(prevPrice !== null){
+      const diff = price - prevPrice;
+      const diffPercent = (diff / prevPrice) * 100;
+      changeEl.textContent = (diff >= 0 ? '+' : '') + diffPercent.toFixed(2) + '%';
+
+      if(diff > 0) el.style.color = 'var(--success)';
+      else if(diff < 0) el.style.color = 'var(--danger)';
+      else el.style.color = '#fff';
+    }
+    el.textContent = price.toFixed(6);
+    prevPrice = price;
+  }
+
+  function updateTimeUI() {
+    $('currentTime').textContent = nowTime();
+  }
+
+  /* ====== Slide Evaluations (4 slides) ====== */
+
+  function evaluateSlides() {
+    // ปกติจะใช้ราคาปัจจุบันล่าสุด + EMA55 + RSI
+    const price = prevPrice;
+    const rsi = rsiValue;
+    const ema = ema55;
+
+    // ป้องกันข้อมูลไม่พร้อม
+    if(!price || !rsi || !ema) return;
+
+    /* --- Slide 1: Continue Up ---
+       RSI>70 → RSI<30 → RSI>70 → price>EMA55 → Long
+       Check steps in order, mark completed steps, show progress
+    */
+    let s1 = slidesSteps[1];
+    if(!s1[0] && rsi > 70) s1[0] = true;
+    if(s1[0] && !s1[1] && rsi < 30) s1[1] = true;
+    if(s1[1] && !s1[2] && rsi > 70) s1[2] = true;
+    if(s1[2] && !s1[3] && price > ema) s1[3] = true;
+
+    updateSlideUI(1, s1);
+
+    /* --- Slide 2: Reversal Down ---
+       RSI>70 → RSI<30 → RSI>70 → price breaks above EMA then falls → Short
+       Complex step: we need to detect price breaking above EMA after step 3
+    */
+    let s2 = slidesSteps[2];
+    if(!s2[0] && rsi > 70) s2[0] = true;
+    if(s2[0] && !s2[1] && rsi < 30) s2[1] = true;
+    if(s2[1] && !s2[2] && rsi > 70) s2[2] = true;
+
+    // Detect price breaking above EMA after step 3
+    if(s2[2]){
+      if(!slide2_brokeAboveEMA && price > ema){
+        slide2_brokeAboveEMA = true;
+        $('slide2-awaiting').textContent = 'รอราคาตกลง';
+        // Wait for price to fall below EMA for final step
+      } else if(slide2_brokeAboveEMA && price < ema){
+        s2[3] = true;
+      }
+    }
+    updateSlideUI(2, s2);
+
+    /* --- Slide 3: Continue Down ---
+       RSI<30 → RSI>70 → RSI<30 → price < EMA → Short
+    */
+    let s3 = slidesSteps[3];
+    if(!s3[0] && rsi < 30) s3[0] = true;
+    if(s3[0] && !s3[1] && rsi > 70) s3[1] = true;
+    if(s3[1] && !s3[2] && rsi < 30) s3[2] = true;
+    if(s3[2] && !s3[3] && price < ema) s3[3] = true;
+    updateSlideUI(3, s3);
+
+    /* --- Slide 4: Reversal Up ---
+       RSI<30 → RSI>70 → RSI<30(no new low) → price breaks below EMA then rises → Long
+       Step 3 check no new low price in last period
+       Detect price breaking below EMA after step 3
+    */
+    let s4 = slidesSteps[4];
+    if(!s4[0] && rsi < 30){
+      s4[0] = true;
+      slide4_price_at_step1_low = price;
+    }
+    if(s4[0] && !s4[1] && rsi > 70) s4[1] = true;
+    if(s4[1] && !s4[2]){
+      // RSI<30 no new low -> check price didn't go below last low price (slide4_price_at_step1_low)
+      if(rsi < 30 && price >= slide4_price_at_step1_low){
+        s4[2] = true;
+      }
+    }
+    if(s4[2]){
+      if(!slide4_brokeBelowEMA && price < ema){
+        slide4_brokeBelowEMA = true;
+        $('slide4-awaiting').textContent = 'รอราคาขึ้น';
+      } else if(slide4_brokeBelowEMA && price > ema){
+        s4[3] = true;
+      }
+    }
+    updateSlideUI(4, s4);
+
+    // Update bot status
+    updateBotStatus();
+  }
+
+  function updateSlideUI(slideNum, steps) {
+    const progress = steps.filter(s => s).length;
+    const percent = (progress / steps.length) * 100;
+    $(`slide${slideNum}-progress`).style.width = percent + '%';
+    $(`slide${slideNum}-progress-text`).textContent = `${progress}/${steps.length}`;
+
+    let statusText = 'รอสัญญาณ';
+    if(progress === steps.length) statusText = 'ส่งสัญญาณแล้ว';
+    $(`slide${slideNum}-status`).textContent = statusText;
+  }
+
+  /* ====== Bot status counts ====== */
+  function updateBotStatus(){
+    let sent = 0;
+    let waiting = 0;
+    let active = 0;
+
+    for(let i=1; i<=4; i++){
+      const steps = slidesSteps[i];
+      const progress = steps.filter(s => s).length;
+      if(progress === 4) sent++;
+      else if(progress > 0) active++;
+      else waiting++;
+    }
+    $('sentCount').textContent = sent;
+    $('waitingCount').textContent = waiting;
+    $('activeCount').textContent = active;
+  }
+
+  /* ====== Recent signals list (mock) ====== */
+  const signalsListEl = $('signalsList');
+  function addSignal(text) {
+    if($('noSignals')) $('noSignals').remove();
+    const div = document.createElement('div');
+    div.className = 'signal-entry';
+    div.textContent = text;
+    signalsListEl.prepend(div);
+  }
+
+  /* ====== Run loops ====== */
+
+  // เรียกอัพเดตแท่งเทียน 15m ทุก 30 วินาที เพื่อรีคำนวณ EMA/RSI/Signal
+  updateCandleData();
+  setInterval(updateCandleData, 30000);
+
+  // ดึงราคา realtime ทุก 2 วินาทีเพื่ออัพเดตราคาไหลแบบสด
+  pollRealtimePrice();
+  setInterval(pollRealtimePrice, 2000);
+</script>
+
+</body>
+</html>
